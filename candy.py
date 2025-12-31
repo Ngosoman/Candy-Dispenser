@@ -40,25 +40,23 @@ class CandyDispenser:
 
         # Draw container
         self.canvas.create_rectangle(80, 50, 220, 400, outline="black", width=3)
-        # Visual base (the bottom where candies sit). Apply temporary offset
-        base_y = 400 - self.temp_offset
-
-        # Spring logic — spring anchored at base_y and extends upward
-        # Spring length reduces when compressed (temp_offset > 0)
-        # A basic heuristic: each candy shortens the spring a bit
+        # Spring anchored at the BOTTOM of the container and extends upward.
+        # Candies appear on the top side of the spring (above it) and stack upward.
+        spring_bottom_y = 400
+        # Each candy shortens the spring a bit; temp_offset further compresses it
         spring_length = SPRING_MAX - (len(self.stack) * 20) - self.temp_offset
         spring_length = max(SPRING_MIN, min(SPRING_MAX, spring_length))
-        spring_top_y = base_y - spring_length
+        spring_top_y = spring_bottom_y - spring_length
 
-        # Draw a coil-like spring as a sine/zigzag between spring_top_y and base_y
+        # Draw a coil-like spring as a zigzag between spring_top_y and spring_bottom_y
         cx = 150
         coil_points = []
         steps = 60
         amp = 24  # horizontal amplitude
         for i in range(steps + 1):
             t = i / steps
-            y = spring_top_y + t * (base_y - spring_top_y)
-            # oscillate horizontally
+            y = spring_top_y + t * (spring_bottom_y - spring_top_y)
+            # oscillate horizontally to simulate coils
             x = cx + amp * ((-1) ** i) * (1 - abs(2 * t - 1))
             coil_points.append((x, y))
 
@@ -69,8 +67,8 @@ class CandyDispenser:
 
         self.canvas.create_line(flat, fill="gray40", width=3, smooth=True)
 
-        # Draw candies stacked from base_y upward
-        y = base_y
+        # Draw candies stacked from spring_top_y upward (they sit on top of the spring)
+        y = spring_top_y
         for candy in self.stack:
             y -= CANDY_HEIGHT
             # candy rectangle
