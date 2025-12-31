@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+import random
 
 # ---------------- CONFIG ----------------
 MAX_CAPACITY = 10
@@ -12,7 +13,9 @@ class CandyDispenser:
     def __init__(self, root):
         self.root = root
         self.root.title("Candy Dispenser - Stack + Spring")
+        # each candy is a dict: {"emoji": str, "color": str}
         self.stack = []
+        self.temp_offset = 0  # temporary visual offset for animation (positive compresses)
 
         self.canvas = tk.Canvas(root, width=300, height=450, bg="white")
         self.canvas.pack(side=tk.LEFT, padx=20, pady=20)
@@ -37,24 +40,48 @@ class CandyDispenser:
 
         # Draw container
         self.canvas.create_rectangle(80, 50, 220, 400, outline="black", width=3)
+        # Visual base (the bottom where candies sit). Apply temporary offset
+        base_y = 400 - self.temp_offset
 
-        # Spring logic
-        spring_length = SPRING_MAX - (len(self.stack) * 20)
-        spring_length = max(SPRING_MIN, spring_length)
+        # Spring logic — spring anchored at base_y and extends upward
+        # Spring length reduces when compressed (temp_offset > 0)
+        # A basic heuristic: each candy shortens the spring a bit
+        spring_length = SPRING_MAX - (len(self.stack) * 20) - self.temp_offset
+        spring_length = max(SPRING_MIN, min(SPRING_MAX, spring_length))
+        spring_top_y = base_y - spring_length
 
-        self.canvas.create_line(
-            150, 50,
-            150, 50 + spring_length,
-            width=4
-        )
+        # Draw a coil-like spring as a sine/zigzag between spring_top_y and base_y
+        cx = 150
+        coil_points = []
+        steps = 60
+        amp = 24  # horizontal amplitude
+        for i in range(steps + 1):
+            t = i / steps
+            y = spring_top_y + t * (base_y - spring_top_y)
+            # oscillate horizontally
+            x = cx + amp * ((-1) ** i) * (1 - abs(2 * t - 1))
+            coil_points.append((x, y))
 
-        # Draw candies
-        y = 400
-        for _ in self.stack:
+        # Flatten points for create_line
+        flat = []
+        for (x, y) in coil_points:
+            flat.extend([x, y])
+
+        self.canvas.create_line(flat, fill="gray40", width=3, smooth=True)
+
+        # Draw candies stacked from base_y upward
+        y = base_y
+        for candy in self.stack:
             y -= CANDY_HEIGHT
+            # candy rectangle
             self.canvas.create_rectangle(
                 100, y, 200, y + CANDY_HEIGHT,
-                fill="pink", outline="black"
+                fill=candy.get("color", "pink"), outline="black"
+            )
+            # emoji centered
+            self.canvas.create_text(
+                150, y + CANDY_HEIGHT / 2,
+                text=candy.get("emoji", "🍬"), font=("Arial", 14)
             )
 
         self.info.config(text=f"Candies: {len(self.stack)}/{MAX_CAPACITY}")
@@ -64,7 +91,13 @@ class CandyDispenser:
         if len(self.stack) == MAX_CAPACITY:
             messagebox.showerror("Full", "Dispenser is FULL")
             return
-        self.stack.append("🍬")
+        # pick a random emoji and color for the candy
+        emojis = ['🍬', '🍭', '🍫', '🍪', '🧁', '🍩', '🍡']
+        colors = ['pink', 'lightblue', 'lightgreen', 'yellow', 'orange', 'plum', 'salmon']
+        candy = {"emoji": random.choice(emojis), "color": random.choice(colors)}
+        self.stack.append(candy)
+        # temporarily compress the spring visually
+        self.temp_anim = 40
         self.animate()
         self.draw()
 
@@ -73,6 +106,8 @@ class CandyDispenser:
             messagebox.showwarning("Empty", "Dispenser is EMPTY")
             return
         self.stack.pop()
+        # temporarily decompress the spring visually
+        self.temp_anim = -40
         self.animate()
         self.draw()
 
@@ -87,10 +122,19 @@ class CandyDispenser:
 
     # ------------ ANIMATION ------------
     def animate(self):
-        for _ in range(5):
+        # simple animation that eases temp_anim back to 0
+        steps = 10
+        start = getattr(self, 'temp_anim', 0)
+        for i in range(steps):
+            # ease-out interpolation
+            t = 1 - (i / steps)
+            self.temp_offset = int(start * t)
             self.draw()
             self.root.update()
-            self.root.after(50)
+            self.root.after(30)
+        self.temp_offset = 0
+        # cleanup temp_anim attribute
+        self.temp_anim = 0
 
 # ---------------- RUN ----------------
 root = tk.Tk()
